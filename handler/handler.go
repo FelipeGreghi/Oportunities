@@ -19,18 +19,29 @@ func Init() {
 	db = config.GetSQLite()
 }
 
-// GetOportunities handles GET requests to retrieve all opportunities
+// GetOportunities handles GET requests to retrieve all opportunities or a specific one by ID
 func GetOportunities(ctx *gin.Context) {
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Get all oportunities",
-	})
-}
+	id := ctx.Query("id")
+	openings := []schemas.Opening{}
 
-// GetOportunity handles GET requests to retrieve a single opportunity by ID
-func GetOportunity(ctx *gin.Context) {
-	id := ctx.Param("id")
+	if id != "" {
+		if err := db.Where("id = ?", id).Find(&openings).Error; err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+	} else {
+		if err := db.Find(&openings).Error; err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Get opportunity with ID " + id,
+		"openings": openings,
 	})
 }
 
@@ -73,16 +84,94 @@ func CreateOportunity(ctx *gin.Context) {
 
 // UpdateOportunity handles PUT requests to update an existing opportunity by ID
 func UpdateOportunity(ctx *gin.Context) {
-	id := ctx.Param("id")
+	id := ctx.Query("id")
+	logger.Infof("ID: %v", id)
+	if id == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Query Param ID is required",
+		})
+		return
+	}
+	request := UpdateOpeningRequest{}
+
+	ctx.BindJSON(&request)
+
+	if err := request.Validate(); err != nil {
+		logger.Errorf("Error validating opportunity: %v", err.Error())
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	opening := schemas.Opening{}
+	// Find opportunity by ID
+	if err := db.First(&opening, id).Error; err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{
+			"error": "Opportunity not found",
+		})
+		return
+	}
+
+	if request.Role != "" {
+		opening.Role = request.Role
+	}
+	if request.Company != "" {
+		opening.Company = request.Company
+	}
+	if request.Location != "" {
+		opening.Location = request.Location
+	}
+	if request.Remote != nil {
+		opening.Remote = *request.Remote
+	}
+	if request.Link != "" {
+		opening.Link = request.Link
+	}
+	if request.Salary > 0 {
+		opening.Salary = request.Salary
+	}
+
+	if err := db.Save(&opening).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Update opportunity with ID " + id,
+		"message": "Opportunity updated successfully",
+		"opening": opening,
 	})
 }
 
 // DeleteOportunity handles DELETE requests to delete an opportunity by ID
 func DeleteOportunity(ctx *gin.Context) {
-	id := ctx.Param("id")
+	id := ctx.Query("id")
+	if id == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Query Param ID is required",
+		})
+		return
+	}
+
+	opening := schemas.Opening{}
+	// Find opportunity by ID
+	if err := db.First(&opening, id).Error; err != nil {
+		ctx.JSON(http.StatusNotFound, gin.H{
+			"error": "Opportunity not found",
+		})
+		return
+	}
+
+	if err := db.Delete(&opening).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Delete opportunity with ID " + id,
+		"message": "Opportunity deleted successfully",
+		"opening": opening,
 	})
 }

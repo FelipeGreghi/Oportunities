@@ -38,3 +38,20 @@ func (c *CreateOpeningRequest) Validate() error {
 	}
 	return nil
 }
+
+//UpdateOpening
+type UpdateOpeningRequest struct {
+	Role     string  `json:"role"`
+	Company  string  `json:"company"`
+	Location string  `json:"location"`
+	Remote   *bool   `json:"remote"`
+	Link     string  `json:"link"`
+	Salary   float64 `json:"salary"`
+}
+
+func (u *UpdateOpeningRequest) Validate() error {
+	if u.Role != "" || u.Company != "" || u.Location != "" || u.Remote != nil || u.Link != "" || u.Salary != 0 {
+		return nil
+	}
+	return fmt.Errorf("at least one field is required")
+}
